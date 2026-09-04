@@ -1,0 +1,36 @@
+Agar aap Windows 10/11 mein system ki junk/temporary files delete karna chahte ho, ye safe methods use karo:
+
+🧹 Method 1 — Temporary files
+
+Win + R dabao, phir:
+
+%temp%
+
+Enter → Ctrl + A → Delete.
+Jo files delete na hon, unhein Skip kar do.
+
+Phir Win + R:
+
+temp
+
+Enter → Ctrl+A → Delete.
+
+Phir:
+
+prefetch
+
+Enter → Ctrl+A → Delete/Skip.
+
+🛠️ Method 2 — Windows Disk Cleanup
+
+Win + R → type:
+
+cleanmgr
+
+Enter → C: select karo → Clean up system files → unnecessary temporary items select karo → OK.
+
+⚡ Method 3 — CMD
+
+Command Prompt (Administrator) kholo aur:
+
+del /q/f/s "%TEMP%\*"
