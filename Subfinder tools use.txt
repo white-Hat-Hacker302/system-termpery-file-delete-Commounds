@@ -1,0 +1,259 @@
+1. Check installation/version
+subfinder -version
+
+Help:
+subfinder -h
+
+Available data sources:
+subfinder -ls
+
+-ls important hai, kyun ke current build mein available sources dekhne ka reliable tareeqa yehi hai. GitHub
+2. Basic subdomain enumeration
+subfinder -d example.com
+
+Example output:
+www.example.com
+api.example.com
+dev.example.com
+mail.example.com
+shop.example.com
+
+Sirf clean results chahiye:
+subfinder -d example.com -silent
+
+File mein save:
+subfinder -d example.com -silent -o subdomains.txt
+
+3. Multiple domains
+targets.txt:
+example.com
+example.org
+example.net
+
+Run:
+subfinder -dL targets.txt -silent
+
+Results directory mein alag-alag save karne ke liye:
+subfinder -dL targets.txt -oD results/
+
+-dL multiple root domains aur -oD list-based output directory ke liye supported hain. GitHub
+4. Pro-level: all available sources
+subfinder -d example.com -all -silent
+
+-all maximum supported sources try karta hai, lekin normal enumeration se slower ho sakta hai. GitHub
+Results:
+subfinder -d example.com -all -silent -o all_subdomains.txt
+
+Duplicate cleanup:
+sort -u all_subdomains.txt -o all_subdomains.txt
+
+Count:
+wc -l all_subdomains.txt
+
+5. Specific sources select karna
+Pehle:
+subfinder -ls
+
+Phir selected sources:
+subfinder -d example.com -s crtsh,github -silent
+
+Kisi problematic/noisy source ko exclude:
+subfinder -d example.com -es zoomeyeapi -silent
+
+Source selection -s aur exclusion -es officially supported hain. GitHub
+6. API keys — real pro-level setup
+Subfinder ka basic mode bina API keys ke bhi kaam karta hai, lekin kai providers ke liye API credentials configure karne se coverage improve hoti hai. Current Subfinder provider configuration file aur custom provider-config path support karta hai. GitHub
+Typical Linux/Kali location:
+~/.config/subfinder/provider-config.yaml
+
+Example structure:
+github:
+  - YOUR_GITHUB_TOKEN
+
+shodan:
+  - YOUR_SHODAN_KEY
+
+securitytrails:
+  - YOUR_SECURITYTRAILS_KEY
+
+Real keys ko GitHub repository ya screenshots mein expose na karein.
+Custom provider file:
+subfinder -d example.com -pc provider-config.yaml
+
+Environment variable bhi available hai:
+export SUBFINDER_PROVIDER_CONFIG="/home/kali/provider-config.yaml"
+
+Provider availability/version change ho sakti hai, isliye current list ke liye:
+subfinder -ls
+
+7. Recursive enumeration
+subfinder -d example.com -recursive -silent
+
+Ye sirf un sources ko use karta hai jo recursive subdomain discovery support karte hain—for example deeper names such as:
+dev.example.com
+api.dev.example.com
+internal.api.dev.example.com
+
+-recursive current CLI ka official option hai. GitHub
+8. Active/resolvable subdomains only
+Passive enumeration:
+subfinder -d example.com -silent
+
+Resolvable/active results:
+subfinder -d example.com -nW -silent
+
+IP addresses bhi:
+subfinder -d example.com -nW -oI
+
+-nW active/resolvable subdomains filter karta hai, jabki -oI active mode mein host IP include kar sakta hai. GitHub
+Save:
+subfinder -d example.com -nW -oI -o active.txt
+
+9. Custom DNS resolvers
+Specific resolvers:
+subfinder -d example.com -nW -r 1.1.1.1,8.8.8.8
+
+Resolver file:
+1.1.1.1
+8.8.8.8
+9.9.9.9
+
+Run:
+subfinder -d example.com -nW -rL resolvers.txt
+
+The CLI supports both -r and -rL. GitHub
+10. JSONL output
+subfinder -d example.com -oJ -o results.jsonl
+
+Pro-level source attribution:
+subfinder -d example.com -oJ -cs -o results.jsonl
+
+-cs JSON output ke saath discovered host ke contributing sources collect karta hai. GitHub
+Readable view with jq:
+cat results.jsonl | jq
+
+Sirf hostname field inspect karne ke liye JSON structure pehle dekhein:
+head -n 1 results.jsonl | jq
+
+11. Verbose debugging
+Agar results ya API problem ho:
+subfinder -d example.com -v
+
+No colors:
+subfinder -d example.com -v -nc
+
+Version:
+subfinder -version
+
+12. Rate limiting
+Professional recon mein provider limits respect karna important hai.
+Overall limit:
+subfinder -d example.com -all -rl 10
+
+Provider-specific rate limits ka current syntax:
+subfinder -d example.com -rls "hackertarget=10/s,shodan=15/s"
+
+Subfinder currently global -rl aur per-provider -rls support karta hai. GitHub
+13. Timeout control
+subfinder -d example.com -timeout 30
+
+Maximum enumeration duration:
+subfinder -d example.com -max-time 10
+
+Example:
+subfinder \
+  -d example.com \
+  -all \
+  -silent \
+  -timeout 30 \
+  -max-time 10 \
+  -o subdomains.txt
+
+14. Subfinder + httpx professional pipeline
+Subfinder subdomains discover karta hai. Uske baad httpx se dekh sakte hain kaunse authorized hosts par HTTP/HTTPS service respond kar rahi hai.
+subfinder -d example.com -all -silent | httpx -silent
+
+Save:
+subfinder -d example.com -all -silent |
+httpx -silent > live-web.txt
+
+Status codes:
+subfinder -d example.com -all -silent |
+httpx -silent -status-code
+
+Title:
+subfinder -d example.com -all -silent |
+httpx -silent -title
+
+Combined:
+subfinder -d example.com -all -silent |
+httpx -silent -status-code -title
+
+This workflow is useful because Subfinder itself focuses on passive subdomain discovery and is designed to work through stdin/stdout pipelines. GitHub
+15. A solid authorized bug-bounty workflow
+mkdir recon
+cd recon
+
+Discovery:
+subfinder -d example.com -all -silent -o subdomains.txt
+
+Deduplicate:
+sort -u subdomains.txt -o subdomains.txt
+
+Count:
+wc -l subdomains.txt
+
+Check resolvable hosts:
+subfinder -d example.com -all -nW -silent -o resolved.txt
+
+Find HTTP services:
+cat resolved.txt |
+httpx -silent -status-code -title -o web-services.txt
+
+Your folder becomes:
+recon/
+├── subdomains.txt
+├── resolved.txt
+└── web-services.txt
+
+16. My recommended Subfinder command
+For a thorough authorized recon run:
+subfinder \
+  -d example.com \
+  -all \
+  -recursive \
+  -silent \
+  -rl 10 \
+  -timeout 30 \
+  -max-time 10 \
+  -o subdomains.txt
+
+For data analysis/source attribution:
+subfinder \
+  -d example.com \
+  -all \
+  -oJ \
+  -cs \
+  -rl 10 \
+  -o subfinder-results.jsonl
+
+And remember the most useful flags:
+-d           Single domain
+-dL          Domain list
+-all         All sources
+-s           Select sources
+-es          Exclude sources
+-ls          List sources
+-recursive   Recursive-capable sources
+-silent      Clean output
+-o           Save output
+-oJ          JSONL output
+-cs          Include source information
+-nW          Resolvable/active hosts
+-oI          Include IP
+-r / -rL     DNS resolvers
+-rl          Global rate limit
+-rls         Provider rate limits
+-timeout     Request timeout
+-max-time    Maximum enumeration time
+-v           Verbose/debug mode

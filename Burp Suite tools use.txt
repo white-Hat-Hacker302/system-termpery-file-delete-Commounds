@@ -1,0 +1,19 @@
+1. Burp start + browser setup
+Burp open karein:
+Burp Suite
+→ Temporary project
+→ Use Burp defaults
+→ Start Burp
+
+Phir:
+Proxy
+→ Intercept
+→ Open Browser
+
+Burp ka built-in browser pehle se proxy ke liye configured hota hai, including HTTPS, isliye beginner aur professional testing dono ke liye ye easiest starting point hai. PortSwigger
+2. Sab se pehle Target Scope set karein
+Ye professional workflow ka bahut important part hai.
+Example authorized lab:
+https://example-lab.com
+
+Burp mein

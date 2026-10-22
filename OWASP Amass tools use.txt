@@ -1,0 +1,200 @@
+1. Installation / version check
+Kali Linux par:
+sudo apt update
+sudo apt install amass -y
+
+Phir:
+amass -version
+amass -help
+
+OWASP ke mutabiq Amass Kali par package ke through available hai. GitHub
+2. Basic subdomain enumeration
+Practice ke liye example.com ki jagah apna authorized domain use karein:
+amass enum -d example.com
+
+Output file mein save:
+amass enum -d example.com -o subdomains.txt
+
+Ye Amass ka core enumeration workflow hai. GitHub
+3. Passive reconnaissance — bug bounty ke liye achha starting point
+amass enum -passive -d example.com -o passive.txt
+
+Passive mode third-party/public data sources se information collect karta hai aur direct aggressive DNS brute-forcing se bachata hai.
+Results:
+cat passive.txt
+
+Unique results:
+sort -u passive.txt > passive_unique.txt
+
+Count:
+wc -l passive_unique.txt
+
+4. Data source dekhna
+Kis source ne subdomain discover kiya:
+amass enum -src -d example.com
+
+IP address bhi show karna:
+amass enum -src -ip -d example.com
+
+Typical output conceptually aisa ho sakta hai:
+www.example.com
+api.example.com
+dev.example.com
+mail.example.com
+
+Official Amass CLI source/IP reporting support karti hai. GitHub
+5. Pro enumeration
+Authorized target par:
+amass enum \
+-d example.com \
+-src \
+-ip \
+-o amass_results.txt
+
+Ya output prefix use karke multiple supported output artifacts:
+amass enum -d example.com -oA example_amass
+
+6. Multiple domains
+domains.txt:
+example.com
+example.org
+example.net
+
+Run:
+amass enum -df domains.txt -o all_subdomains.txt
+
+Ye large authorized scope/bounty programs mein useful hai. GitHub
+7. DNS brute-force
+Sirf jab program rules active/brute-force enumeration allow karte hon:
+amass enum -brute -d example.com
+
+Custom wordlist:
+amass enum \
+-brute \
+-w wordlist.txt \
+-d example.com \
+-o brute_results.txt
+
+Example wordlist.txt:
+www
+api
+dev
+test
+staging
+admin
+portal
+vpn
+mail
+cdn
+
+8. Known names ko Amass mein feed karna
+Suppose Subfinder ya manually collected results known.txt mein hain:
+api.example.com
+dev.example.com
+portal.example.com
+
+Amass:
+amass enum -d example.com -nf known.txt
+
+Is se Amass existing names ko starting intelligence ke taur par use kar sakta hai. GitHub
+9. Organization intelligence
+Amass sirf subdomain scanner nahi hai. intel organization/domain infrastructure research ke liye bhi hai:
+amass intel -d example.com
+
+WHOIS-based intelligence:
+amass intel -whois -d example.com
+
+IP output:
+amass intel -whois -ip -d example.com
+
+ASN investigation, jab ASN aapke authorized scope ka hissa ho:
+amass intel -asn 13335
+
+Amass documentation ke mutabiq intel organization intelligence aur root-domain discovery ke liye design kiya gaya hai. GitHub
+10. Pro-level API configuration
+Amass v5 mein external data sources ke credentials datasources.yaml mein configure kiye ja sakte hain. Official docs Shodan, VirusTotal, SecurityTrails, GitHub, GitLab, URLScan aur dusre sources list karti hain. Amass
+Example:
+datasources:
+  - name: VirusTotal
+    creds:
+      account:
+        apikey: YOUR_API_KEY
+
+  - name: Shodan
+    creds:
+      account:
+        apikey: YOUR_API_KEY
+
+Phir config.yaml:
+scope:
+  domains:
+    - example.com
+
+options:
+  datasources: "./datasources.yaml"
+
+API keys ko GitHub par public commit mat karein.
+11. Recommended professional workflow
+mkdir amass-project
+cd amass-project
+
+Passive discovery:
+amass enum -passive -d example.com -o passive.txt
+
+Normalize:
+sort -u passive.txt > passive_unique.txt
+
+Standard enumeration:
+amass enum -d example.com -src -ip -o active_enum.txt
+
+Merge:
+cat passive_unique.txt active_enum.txt | sort -u > all_domains.txt
+
+Check total:
+wc -l all_domains.txt
+
+Search interesting names:
+grep -Ei 'api|dev|test|stage|staging|admin|portal|vpn|auth' all_domains.txt
+
+Ye sirf prioritization hai; aisa hostname milna vulnerability ka proof nahi hota.
+Useful command cheat sheet
+# Help
+amass -help
+
+# Version
+amass -version
+
+# Basic
+amass enum -d example.com
+
+# Passive
+amass enum -passive -d example.com
+
+# Save results
+amass enum -d example.com -o results.txt
+
+# Source information
+amass enum -src -d example.com
+
+# IP addresses
+amass enum -ip -d example.com
+
+# Source + IP
+amass enum -src -ip -d example.com
+
+# Multiple domains
+amass enum -df domains.txt
+
+# Brute-force, authorized scopes only
+amass enum -brute -d example.com
+
+# Custom wordlist
+amass enum -brute -w words.txt -d example.com
+
+# Intelligence
+amass intel -d example.com
+
+# WHOIS intelligence
+amass intel -whois -d example.com
+
+Ek current v5 note: v5.1.1 mein -alts alteration functionality ke bare mein August 2026 ka reported issue maujood hai, isliye alteration results par akelay rely na karein jab tak issue/version status verify na kar lein.

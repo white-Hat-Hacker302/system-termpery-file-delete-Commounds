@@ -1,0 +1,227 @@
+Sirf apne network, lab, CTF, ya jis target ki written permission ho us par scan karein.
+1. Basic commands
+nmap --version
+
+Single system:
+nmap 192.168.1.10
+
+Entire home/lab subnet:
+nmap 192.168.1.0/24
+
+Specific hosts:
+nmap 192.168.1.10 192.168.1.20
+
+Specific ports:
+nmap -p 22,80,443,8080 192.168.1.10
+
+Port range:
+nmap -p 1-1000 192.168.1.10
+
+All 65,535 TCP ports:
+nmap -p- 192.168.1.10
+
+2. Host discovery
+Network mein live devices discover karne ke liye:
+nmap -sn 192.168.1.0/24
+
+Is stage mein normal port scan nahi hota; ye host discovery ke liye useful hai.
+Agar authorized host ICMP/ping ka response nahi deta:
+nmap -Pn 192.168.1.10
+
+-Pn Nmap ko host ko up assume karke scanning continue karne kehta hai.
+3. Professional TCP scanning
+Linux/Kali par:
+sudo nmap -sS 192.168.1.10
+
+Specific ports:
+sudo nmap -sS -p 22,80,443 192.168.1.10
+
+All TCP ports:
+sudo nmap -sS -p- 192.168.1.10
+
+Sirf open ports show karne ke liye:
+sudo nmap -sS -p- --open 192.168.1.10
+
+-sS SYN scan hai. Agar raw-packet privileges available na hon, -sT TCP connect scan use ho sakta hai. Nmap
+nmap -sT 192.168.1.10
+
+4. Service + version detection
+Open port mil jana enough nahi hota. Aapko pata hona chahiye port ke peeche actual service aur version kya hai.
+nmap -sV 192.168.1.10
+
+Specific discovered ports:
+nmap -sV -p 22,80,443 192.168.1.10
+
+More detailed version detection:
+nmap -sV --version-all -p 22,80,443 192.168.1.10
+
+Light/faster detection:
+nmap -sV --version-light 192.168.1.10
+
+Nmap service detection protocol, application, version, device type aur kuch cases mein CPE information identify kar sakti hai. Nmap
+5. OS detection
+sudo nmap -O 192.168.1.10
+
+More aggressive OS guessing:
+sudo nmap -O --osscan-guess 192.168.1.10
+
+OS detection generally tab better hoti hai jab target par kam az kam ek open aur ek closed TCP port mil jaye. Nmap
+6. NSE — Nmap Scripting Engine
+Basic/default NSE scripts:
+nmap -sC 192.168.1.10
+
+Service detection + default scripts:
+nmap -sV -sC 192.168.1.10
+
+HTTP information:
+nmap -p 80,443 --script http-title 192.168.1.10
+
+HTTP headers:
+nmap -p 80,443 --script http-headers 192.168.1.10
+
+SSL certificate:
+nmap -p 443 --script ssl-cert 192.168.1.10
+
+SSH information:
+nmap -p 22 --script ssh2-enum-algos 192.168.1.10
+
+NSE script ki documentation:
+nmap --script-help http-title
+
+Safe category:
+nmap --script safe 192.168.1.10
+
+NSE mein safe, default, discovery, version, vuln, intrusive, exploit, dos aur doosri categories hain. Nmap khud warn karta hai ke kuch scripts intrusive ya damaging ho sakti hain, isliye unfamiliar scripts ko production systems par blindly na chalayein. Nmap
+7. Authorized vulnerability assessment
+Apne lab/testing server par:
+nmap -sV --script vuln 192.168.1.10
+
+Specific web ports:
+nmap -sV -p 80,443 --script vuln 192.168.1.10
+
+Professional practice mein pehle service/version identify karein aur phir relevant checks chalayein, instead of har target par blindly sari NSE scripts chalana.
+8. UDP scanning
+UDP scan:
+sudo nmap -sU 192.168.1.10
+
+Common UDP ports:
+sudo nmap -sU -p 53,67,68,69,123,161,162 192.168.1.10
+
+UDP service detection:
+sudo nmap -sU -sV -p 53,123,161 192.168.1.10
+
+TCP + UDP selected ports:
+sudo nmap -sS -sU \
+-p T:22,80,443,U:53,123,161 \
+-sV 192.168.1.10
+
+9. Timing
+Normal:
+nmap -T3 192.168.1.10
+
+Fast/reliable LAN:
+nmap -T4 192.168.1.10
+
+Nmap's official guide recommends -T4 for reasonably modern, reliable networks; -T5 trades some accuracy/reliability for speed. Nmap
+A good professional example:
+sudo nmap -sS -p- --open -T4 192.168.1.10
+
+10. Save professional reports
+Normal output:
+nmap -sV 192.168.1.10 -oN report.txt
+
+XML:
+nmap -sV 192.168.1.10 -oX report.xml
+
+Best option:
+nmap -sV 192.168.1.10 -oA client_scan
+
+-oA normal, XML aur grepable versions ek saath create karta hai. Nmap
+Result files:
+client_scan.nmap
+client_scan.xml
+client_scan.gnmap
+
+11. My recommended pro workflow
+Suppose 192.168.1.50 aapka authorized lab machine hai.
+Step 1 — check host
+nmap -sn 192.168.1.50
+
+Step 2 — full TCP discovery
+sudo nmap -sS -p- --open -T4 \
+-oA 01-full-tcp \
+192.168.1.50
+
+Assume result:
+22/tcp   open ssh
+80/tcp   open http
+443/tcp  open https
+3306/tcp open mysql
+
+Step 3 — investigate only discovered ports
+sudo nmap -sV -sC -O \
+-p 22,80,443,3306 \
+192.168.1.50 \
+-oA 02-detailed
+
+Step 4 — web enumeration
+nmap -p 80,443 \
+--script "http-title,http-headers,ssl-cert" \
+192.168.1.50 \
+-oA 03-web
+
+Step 5 — selected UDP services
+sudo nmap -sU -sV \
+-p 53,123,161 \
+192.168.1.50 \
+-oA 04-udp
+
+12. Useful -A command
+sudo nmap -A 192.168.1.50
+
+-A bundles OS detection, service/version detection, script scanning and traceroute, so it's convenient but relatively noisy/heavier than running only the checks you actually need. Nmap
+Result ko kaise samjhein
+PORT     STATE      SERVICE
+22/tcp   open       ssh
+80/tcp   open       http
+445/tcp  filtered   microsoft-ds
+8080/tcp closed     http-proxy
+
+open = koi application port par listening hai.
+closed = host reachable hai, lekin port par service listening nahi.
+filtered = Nmap reliably determine nahi kar paa raha, commonly firewall/filtering ki wajah se.
+Pro command cheat sheet
+# Discover hosts
+nmap -sn 192.168.1.0/24
+
+# TCP SYN scan
+sudo nmap -sS 192.168.1.50
+
+# Full TCP ports
+sudo nmap -sS -p- 192.168.1.50
+
+# Only open ports
+sudo nmap -sS -p- --open 192.168.1.50
+
+# Services + versions
+nmap -sV 192.168.1.50
+
+# OS detection
+sudo nmap -O 192.168.1.50
+
+# Default NSE
+nmap -sC 192.168.1.50
+
+# Services + scripts
+nmap -sV -sC 192.168.1.50
+
+# UDP
+sudo nmap -sU 192.168.1.50
+
+# Fast authorized LAN scan
+sudo nmap -sS -p- -T4 192.168.1.50
+
+# Save complete report
+sudo nmap -sS -sV -sC -O -oA assessment 192.168.1.50
+
+Official Nmap reference guide: Nmap Reference Guide

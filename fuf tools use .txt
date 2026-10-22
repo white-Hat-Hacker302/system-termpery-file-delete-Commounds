@@ -1,0 +1,315 @@
+1. Basic syntax
+The main idea is:
+ffuf -w WORDLIST -u https://target.example/FUZZ
+
+Example on an authorized lab:
+ffuf -w /usr/share/seclists/Discovery/Web-Content/common.txt \
+-u https://target.example/FUZZ
+
+-w = wordlist, -u = URL, and FUZZ is where each word is inserted. GitHub
+2. Pro directory discovery
+A useful starting command is:
+ffuf \
+-w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt \
+-u https://target.example/FUZZ \
+-mc 200,204,301,302,307,401,403 \
+-ac \
+-t 40 \
+-v
+
+-mc chooses HTTP status codes to display, while -ac automatically calibrates filters to reduce false positives such as soft-404 pages. ffuf uses 40 concurrent threads by default. GitHub
+3. File + extension discovery
+ffuf \
+-w /usr/share/seclists/Discovery/Web-Content/raft-medium-words.txt \
+-u https://target.example/FUZZ \
+-e .php,.html,.txt,.js,.json,.xml,.bak \
+-ac
+
+The -e option appends extensions to entries from the wordlist. GitHub
+For example, ffuf may check:
+/admin
+/admin.php
+/admin.json
+/login
+/login.php
+/config
+/config.bak
+
+4. Filtering false positives
+This is one of the most important ffuf skills.
+Filter HTTP status:
+ffuf -w words.txt -u https://target.example/FUZZ -fc 404
+
+Filter response size:
+ffuf -w words.txt -u https://target.example/FUZZ -mc all -fs 4242
+
+Filter word count:
+ffuf -w words.txt -u https://target.example/FUZZ -mc all -fw 57
+
+Filter line count:
+ffuf -w words.txt -u https://target.example/FUZZ -fl 12
+
+ffuf supports matching/filtering on status code, size, words, lines, regex, and response time. Numeric filters can contain comma-separated values or ranges. GitHub
+A very useful command is simply:
+ffuf -w words.txt -u https://target.example/FUZZ -ac
+
+because -ac can automatically identify common unwanted responses. GitHub
+5. Recursive discovery
+After finding directories such as /admin/, automatically search inside them:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-recursion \
+-recursion-depth 2 \
+-ac
+
+For more aggressive recursion:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-recursion \
+-recursion-strategy greedy \
+-recursion-depth 2 \
+-ac
+
+default recursion mainly follows resources that behave like directories; greedy tries recursion on every match, generating considerably more requests. The URL must end with FUZZ for recursion. GitHub
+6. GET parameter-name discovery
+Suppose you have:
+https://target.example/profile
+
+Try discovering parameter names:
+ffuf \
+-w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt \
+-u 'https://target.example/profile?FUZZ=test' \
+-ac
+
+Possible discoveries could be:
+?id=test
+?page=test
+?user=test
+?lang=test
+
+7. Parameter value discovery
+Once an authorized application is known to accept something like:
+?id=
+
+you can fuzz values:
+ffuf \
+-w values.txt \
+-u 'https://target.example/profile?id=FUZZ' \
+-ac
+
+You can also generate numeric inputs directly:
+ffuf \
+-input-cmd 'seq 1 200' \
+-input-num 200 \
+-u 'https://target.example/user/FUZZ'
+
+ffuf officially supports generated input through -input-cmd and -input-num. GitHub
+8. POST form fuzzing
+ffuf \
+-w values.txt \
+-u https://target.example/login \
+-X POST \
+-H 'Content-Type: application/x-www-form-urlencoded' \
+-d 'username=FUZZ&password=test123' \
+-ac
+
+You can also filter common failed-login text:
+ffuf \
+-w users.txt \
+-u https://target.example/login \
+-X POST \
+-H 'Content-Type: application/x-www-form-urlencoded' \
+-d 'username=FUZZ&password=test123' \
+-fr 'Invalid username'
+
+-fr filters responses matching a regular expression. GitHub
+9. JSON API fuzzing
+ffuf \
+-w values.txt \
+-u https://target.example/api/profile \
+-X POST \
+-H 'Content-Type: application/json' \
+-d '{"username":"FUZZ"}' \
+-ac
+
+ffuf doesn't automatically infer the correct Content-Type from the body, so specifying the appropriate header is important. GitHub
+10. Virtual-host discovery
+For an authorized domain:
+ffuf \
+-w subdomains.txt \
+-u https://target.example/ \
+-H 'Host: FUZZ.target.example' \
+-ac
+
+Another approach when you know the normal response size:
+ffuf \
+-w subdomains.txt \
+-u https://target.example/ \
+-H 'Host: FUZZ.target.example' \
+-fs 4242
+
+Header values can contain the FUZZ keyword, which is how ffuf supports virtual-host discovery. GitHub
+11. Cookies / authenticated testing
+For your authorized authenticated session:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-b 'session=YOUR_SESSION_COOKIE' \
+-ac
+
+Or:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-H 'Authorization: Bearer YOUR_TEST_TOKEN' \
+-ac
+
+-b supports cookie data, while -H can be repeated for custom headers. GitHub
+12. Burp Suite + ffuf
+Send all traffic through Burp:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-x http://127.0.0.1:8080
+
+A better pro workflow is often:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-ac \
+-replay-proxy http://127.0.0.1:8080
+
+-replay-proxy sends only matched, non-filtered requests to the proxy, which prevents Burp's history from filling with every failed request. GitHub
+13. Raw Burp request fuzzing
+Save a request from Burp as:
+request.txt
+
+Put FUZZ where you want testing performed, then:
+ffuf \
+-w payloads.txt \
+-request request.txt
+
+For an HTTP-only target:
+ffuf \
+-w payloads.txt \
+-request request.txt \
+-request-proto http
+
+ffuf can parse raw requests including headers, method, and request data. GitHub
+14. Multiple wordlists
+ffuf supports named fuzzing positions.
+ffuf \
+-w parameters.txt:PARAM \
+-w values.txt:VALUE \
+-u 'https://target.example/?PARAM=VALUE'
+
+You can choose modes such as:
+-mode clusterbomb
+
+-mode pitchfork
+
+-mode sniper
+
+These multi-wordlist modes are part of ffuf's current CLI. GitHub
+15. Rate limiting
+Don't hammer a bug-bounty target.
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-rate 10
+
+Or control concurrency:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-t 10
+
+-t controls concurrent workers; -rate limits total requests per second. GitHub
+For many bug-bounty programs, something like:
+-rate 5
+
+or
+-rate 10
+
+is a safer starting point, but always follow that program's explicit rate-limit rules.
+16. Save professional results
+JSON:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-ac \
+-o results.json \
+-of json
+
+HTML:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-ac \
+-o report.html \
+-of html
+
+CSV:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-ac \
+-o report.csv \
+-of csv
+
+ffuf currently supports JSON, EJSON, HTML, Markdown, CSV and ECSV output, plus all. GitHub
+You can even store the matched response bodies:
+ffuf \
+-w words.txt \
+-u https://target.example/FUZZ \
+-ac \
+-od matched_responses
+
+17. Interactive mode
+While ffuf is running, press:
+ENTER
+
+You enter its interactive console.
+Then:
+help
+
+You can change filters without restarting the scan. For example:
+fc 404
+
+or:
+fs 4242
+
+and resume afterward. ffuf reapplies changed filters to already collected results as well. GitHub
+My recommended pro workflow
+Start with:
+ffuf \
+-w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt \
+-u https://target.example/FUZZ \
+-mc all \
+-ac \
+-rate 10 \
+-t 20 \
+-o discovery.json \
+-of json
+
+Then investigate interesting directories:
+ffuf \
+-w /usr/share/seclists/Discovery/Web-Content/raft-medium-words.txt \
+-u https://target.example/admin/FUZZ \
+-e .php,.html,.js,.json,.txt,.xml \
+-ac \
+-rate 10
+
+Then parameter discovery:
+ffuf \
+-w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt \
+-u 'https://target.example/page?FUZZ=test' \
+-ac \
+-rate 10
+
+Then manually inspect interesting matches in Burp:
+-replay-proxy http://127.0.0.1:8080
+
+That combination—good wordlists + calibration + filtering + controlled rate + Burp verification—is much more useful than simply running ffuf at maximum speed.

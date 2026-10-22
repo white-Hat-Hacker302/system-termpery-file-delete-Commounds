@@ -1,0 +1,420 @@
+1. Professional ZAP workflow
+A good workflow is:
+Scope
+  ↓
+Proxy browser through ZAP
+  ↓
+Manual Explore
+  ↓
+Passive Scan
+  ↓
+Spider / Client Spider
+  ↓
+Authentication + Users
+  ↓
+Active Scan
+  ↓
+Manual verification
+  ↓
+Report
+  ↓
+CI/CD automation
+
+Step 1 — Create a Context and scope
+Instead of scanning an entire domain accidentally:
+Sites
+ └── Right-click your application
+     └── Include in Context
+         └── New Context
+
+Example authorized target:
+https://app.lab.example/
+
+Then configure:
+Session Properties
+→ Contexts
+→ Include in Context
+→ Scope
+
+Contexts let you group the URLs belonging to one application and keep scans restricted to that application. ZAP recommends creating contexts for the applications you are testing. ZAP
+2. Proxy your browser through ZAP
+The easiest method is:
+Quick Start
+→ Manual Explore
+→ Enter URL
+→ Launch Browser
+
+ZAP automatically configures browsers launched this way to proxy through ZAP and handle its testing certificate. ZAP
+For a manually configured browser, ZAP normally listens on:
+Host: 127.0.0.1
+Port: 8080
+
+These are the documented defaults. ZAP
+Now browse the whole application:
+/
+/login
+/dashboard
+/profile
+/settings
+/search
+/api/
+
+Click buttons, submit forms and visit all functions available to your test account.
+You should see requests appear under:
+History
+Sites
+Request
+Response
+
+3. Learn Request / Response analysis
+This is one of the most important ZAP skills.
+Select a request in:
+History
+
+You may see:
+POST /api/profile HTTP/1.1
+Host: app.lab.example
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "username": "testuser"
+}
+
+Study:
+Method
+URL
+Query parameters
+Headers
+Cookies
+Authorization headers
+Request body
+Response status
+Response headers
+Response body
+
+For example:
+200 = successful
+301/302 = redirect
+401 = authentication required
+403 = forbidden
+404 = not found
+500 = server-side error
+
+This lets you understand how the application communicates before running scanners.
+4. Passive Scan first
+ZAP automatically passively examines traffic passing through it. Passive scanning does not modify requests, making it the safer first scanning stage. ZAP
+It may detect things such as:
+Missing security headers
+Cookie configuration issues
+Information leakage
+Cache-control problems
+Mixed content
+Potential sensitive-data exposure
+
+Look at:
+Alerts
+
+Then classify findings by:
+Risk
+Confidence
+URL
+Parameter
+Evidence
+Description
+Solution
+Reference
+
+Do not automatically assume every alert is exploitable.
+5. Crawl the application
+For normal HTML applications:
+Sites
+→ Right-click target
+→ Attack
+→ Spider
+
+The traditional Spider discovers URLs by following links and resources. ZAP
+For modern JavaScript applications, ZAP currently recommends its modern crawling options; its documentation specifically notes that the older AJAX Spider is no longer the preferred crawler for modern apps and recommends the Client Spider where available. ZAP
+A useful workflow is therefore:
+Manual Explore
+      +
+Traditional Spider
+      +
+Client Spider / modern crawler
+
+Then compare the discovered URLs under:
+Sites
+
+6. Authenticated scanning
+This is where ZAP becomes much more useful.
+Without authentication you may only scan:
+/login
+/register
+/public pages
+
+but miss:
+/account
+/dashboard
+/admin functions
+/private APIs
+/settings
+
+Professional configuration looks like:
+Context
+→ Session Management
+→ Authentication
+→ Authentication Verification
+→ Users
+
+ZAP supports several authentication approaches, including form, script, JSON and HTTP/NTLM-based authentication. ZAP
+For a simple form login you might configure:
+Login URL:
+https://app.lab.example/login
+
+with parameters corresponding to your application's login request:
+username={%username%}
+password={%password%}
+
+Then configure a logged-in indicator such as something actually present only after successful login, for example:
+Logout
+
+or:
+My Account
+
+Create a test user:
+Users
+→ Add
+
+Name: zap-test-user
+Username: testuser
+Password: test-password
+
+Then run Spider or Active Scan as that specific user.
+ZAP can automatically reauthenticate during scans when the Context/User authentication configuration is correct. ZAP
+7. Active Scan
+After you know your scope and application behavior:
+Sites
+→ Right-click authorized target
+→ Attack
+→ Active Scan
+
+Select:
+Context
+User
+Scan Policy
+Recurse
+
+ZAP's Active Scan sends attack-style test requests designed to identify certain vulnerability classes. It cannot find everything; ZAP explicitly notes that business-logic problems and many access-control issues require manual testing. ZAP
+For professional testing, use different Scan Policies instead of maxing out every rule.
+Example:
+Policy: Standard-Web
+Policy: API
+Policy: Staging-Deep
+
+You can tune rules under:
+Analyze
+→ Scan Policy Manager
+
+8. Intercept requests
+You can also use ZAP like Burp Proxy.
+Enable interception:
+Break
+
+Then perform an action in the browser.
+ZAP pauses the request.
+You can inspect:
+GET /profile?id=123 HTTP/1.1
+Host: app.lab.example
+Cookie: session=...
+
+You can make controlled modifications during an authorized test and then forward the request.
+This is useful for understanding parameter handling and reproducing findings.
+9. Request Editor
+A very useful workflow is:
+History
+→ Right-click request
+→ Open/Resend with Request Editor
+
+Change one value at a time.
+For example:
+GET /search?q=phone
+
+Change to another harmless value:
+GET /search?q=laptop
+
+Then compare:
+Status code
+Response length
+Headers
+Body
+Response time
+
+This is much better than blindly running automated scanners.
+10. APIs with ZAP
+ZAP has dedicated support for API scanning.
+Its Docker API scanner supports:
+OpenAPI
+SOAP
+GraphQL
+
+and imports the API definition before performing API-focused scanning. ZAP
+For example, for your own local API specification:
+docker run -t \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-api-scan.py \
+  -t http://host.docker.internal:8000/openapi.json \
+  -f openapi
+
+For GraphQL:
+docker run -t \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-api-scan.py \
+  -t http://host.docker.internal:8000/graphql \
+  -f graphql
+
+Use these only against an API you are authorized to scan.
+11. Safe CI/CD scanning
+For production pipelines, the Baseline Scan is especially useful because it performs crawling and passive analysis rather than active attacks. ZAP
+Example:
+docker run -t \
+  ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py \
+  -t https://your-authorized-app.example
+
+Generate an HTML report:
+docker run \
+  -v "$(pwd):/zap/wrk/:rw" \
+  -t ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py \
+  -t https://your-authorized-app.example \
+  -r zap-report.html
+
+The Baseline Scan can return different exit codes for success, warnings and failures, which makes it suitable as a CI security gate. ZAP
+12. Full scan
+For a staging/lab environment where active scanning is authorized:
+docker run \
+  -v "$(pwd):/zap/wrk/:rw" \
+  -t ghcr.io/zaproxy/zaproxy:stable \
+  zap-full-scan.py \
+  -t https://your-staging-app.example \
+  -r zap-full-report.html
+
+The Full Scan performs crawling followed by active scanning, so ZAP warns that it performs real attack-style testing and may run much longer. ZAP
+A good rule is:
+Production:
+Passive/Baseline Scan
+
+Staging:
+Baseline + authenticated crawling
+
+Dedicated security lab:
+Full Active Scan
+
+13. Automation Framework — advanced usage
+For serious projects, learn ZAP's Automation Framework.
+Instead of clicking everything manually:
+ZAP
+     ↓
+zap.yaml
+     ↓
+Context
+     ↓
+Authentication
+     ↓
+Spider
+     ↓
+Active Scan
+     ↓
+Report
+
+ZAP supports running automation plans like:
+zap.sh -cmd -autorun zap.yaml
+
+The Automation Framework is designed to orchestrate jobs such as scanning, authentication and reporting. ZAP
+Docker:
+docker run \
+  -v "$(pwd):/zap/wrk/:rw" \
+  -t zaproxy/zap-stable \
+  zap.sh \
+  -cmd \
+  -autorun /zap/wrk/zap.yaml
+
+This is the direction I'd recommend once you are comfortable with the desktop interface. ZAP
+14. Professional alert analysis
+Suppose ZAP reports:
+Risk: Medium
+Confidence: Medium
+
+Alert:
+Content Security Policy Header Not Set
+
+Don't just report:
+"ZAP found vulnerability."
+
+Verify:
+1. Which URL is affected?
+2. Is the header genuinely absent?
+3. Is it applicable to this response?
+4. Is there another mitigation?
+5. Can you reproduce it?
+6. What is the actual security impact?
+
+Your final report should contain:
+Title
+Risk
+Confidence
+Affected endpoint
+Description
+Evidence
+Reproduction steps
+Impact
+Remediation
+References
+
+ZAP's report generator supports several formats and allows filtering by Context, Site, Risk and Confidence. ZAP
+15. Important ZAP tabs to master
+Focus on these:
+Sites       → application structure
+
+History     → every HTTP request/response
+
+Alerts      → identified security issues
+
+Request     → outgoing HTTP request
+
+Response    → server response
+
+Spider      → traditional crawler
+
+Active Scan → active vulnerability testing
+
+Output      → scanner / automation messages
+
+Scripts     → custom ZAP extensions
+
+Automation → automated testing plans
+
+Pro-level learning order
+I recommend learning ZAP in this sequence:
+Level 1
+Proxy
+History
+Request
+Response
+Passive Scan
+
+        ↓
+
+Level 2
+Contexts
+Scope
+Spider
+Client Spider
+Break/Intercept
+
+        ↓
+
+Level 3
+Authentication
+Sessions
+Users

@@ -1,0 +1,163 @@
+1. Installation
+Current official release ko Go 1.25+ chahiye: GitHub
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+
+Check:
+httpx -version
+httpx -h
+
+Agar httpx: command not found aaye:
+export PATH=$PATH:$HOME/go/bin
+
+2. Basic probing
+Single authorized domain:
+echo example.com | httpx
+
+File se:
+httpx -l subdomains.txt
+
+Useful reconnaissance:
+httpx -l subdomains.txt \
+-silent \
+-sc \
+-title \
+-td \
+-server \
+-ip \
+-cname \
+-cdn \
+-rt
+
+Yahan -sc status code, -title page title, -td technology detection, -server web server, -ip, -cname, -cdn CDN/WAF aur -rt response time deta hai. Ye probes official tool mein supported hain. GitHub
+Example output:
+https://admin.example.com [200] [Admin Panel] [nginx] [PHP,Cloudflare]
+https://api.example.com [401] [Unauthorized] [cloudflare]
+https://old.example.com [403] [Forbidden]
+
+3. Pro bug-bounty pipeline
+subfinder + httpx ek common workflow hai:
+subfinder -d example.com -silent | sort -u > subs.txt
+
+Then:
+httpx -l subs.txt \
+-silent \
+-sc \
+-title \
+-td \
+-server \
+-ip \
+-cname \
+-cdn \
+-location \
+-rt \
+-o live_hosts.txt
+
+Ye aapko raw subdomains ki jagah useful live web targets deta hai.
+4. Interesting status codes filter karna
+Sirf useful responses:
+httpx -l subs.txt -silent -mc 200,201,301,302,401,403
+
+Sirf 200:
+httpx -l subs.txt -silent -mc 200
+
+404 responses hata dein:
+httpx -l subs.txt -silent -fc 404
+
+httpx matchers mein -mc, strings, regex, response time aur DSL conditions hain; filters mein -fc, duplicate filtering aur response-based conditions available hain. GitHub
+5. Login/admin pages identify karna
+Page title aur technology ke saath:
+httpx -l subs.txt -silent -sc -title -td
+
+Specific response string:
+httpx -l subs.txt -ms "login"
+
+Regex matching:
+httpx -l subs.txt -mr "(?i)admin|login|dashboard"
+
+Ye finding khud vulnerability prove nahi karti; ye manual investigation ke liye prioritization hai.
+6. Redirect analysis
+httpx -l subs.txt -sc -location
+
+Redirect follow karna:
+httpx -l subs.txt -fr -sc -title
+
+Same-host redirects tak limited rakhna:
+httpx -l subs.txt -fhr -sc -title
+
+-fr, -fhr aur max redirects configuration officially supported hain. GitHub
+7. Alternate web ports
+Authorized target par common web ports:
+httpx -l subs.txt \
+-p http:80,8080,8000,8888,https:443,8443 \
+-sc -title -td
+
+Official httpx custom HTTP/HTTPS port probing support karta hai. GitHub
+8. Interesting paths
+For example:
+echo example.com | httpx \
+-path "/robots.txt,/sitemap.xml,/.well-known/security.txt" \
+-sc -ct
+
+Official recipes security.txt, robots.txt, sitemap.xml aur well-known endpoints ke liye -path aur match conditions use karti hain. GitHub
+Security.txt:
+echo example.com | httpx \
+-path '/.well-known/security.txt,/security.txt' \
+-mc 200
+
+9. Screenshots / visual recon
+httpx -l live_hosts.txt -ss
+
+Local Chrome:
+httpx -l live_hosts.txt -ss -system-chrome
+
+Useful jab hundreds of web assets ko visually inspect karna ho. -ss headless screenshot functionality officially supported hai. GitHub
+10. JSONL output — automation ke liye
+Professional workflow mein plain text ke bajaye JSONL use karein:
+httpx -l subs.txt \
+-sc -title -td -server -ip -cname \
+-json \
+-o httpx.jsonl
+
+-json JSONL output aur -o file output officially supported hain. GitHub
+Full HTTP headers include karne ke liye:
+httpx -l subs.txt -json -irh -o results.jsonl
+
+Request + response include karne ke liye:
+httpx -l subs.txt -json -irr -o detailed.jsonl
+
+Be careful: authentication cookies/tokens ko result files mein accidentally save na karein.
+11. Rate limiting
+Bug bounty scope aur program rules respect karte hue:
+httpx -l subs.txt -rl 20 -t 10
+
+-rl maximum requests/second aur -t threads control karta hai. Current defaults official help mein 150 req/s aur 50 threads listed hain, isliye external programs par aksar intentionally lower values better hote hain. GitHub
+Gentle configuration:
+httpx -l subs.txt \
+-silent \
+-sc -title -td \
+-rl 10 \
+-t 5 \
+-timeout 10 \
+-retries 1
+
+12. My recommended professional command
+Authorized bug-bounty scope ke liye strong first-pass command:
+httpx -l subs.txt \
+-silent \
+-sc \
+-title \
+-td \
+-server \
+-ip \
+-cname \
+-cdn \
+-location \
+-rt \
+-fr \
+-fc 404 \
+-rl 20 \
+-t 10 \
+-json \
+-o httpx_results.jsonl
+
+Uske baad high-interest assets ko alag karein, jaise 200, 401, 403, uncommon titles, APIs, admin/login portals, unusual technologies, ya alternate ports. httpx ko discovery/prioritization tool samjhein—ye akela vulnerability confirmation tool nahi hai.
